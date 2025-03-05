@@ -8,16 +8,13 @@ from dotenv import load_dotenv
 import discord
 from discord import app_commands
 from discord.ext import commands
-import math  # Adding missing import for the math module used in botinfo command
+import math
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('platanotorrino-bot')
 
-# Bot configuration
 TOKEN = os.getenv('DISCORD_TOKEN')
 CLIENT_ID = os.getenv('CLIENT_ID')
 
@@ -25,12 +22,10 @@ if not TOKEN or not CLIENT_ID:
     logger.error("Missing environment variables. Please set DISCORD_TOKEN and CLIENT_ID.")
     exit(1)
 
-# Create bot instance with intents
 intents = discord.Intents.default()
 intents.message_content = True  
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Display a helpful message about privileged intents
 logger.info("Note: This bot uses privileged intents. Make sure to enable them in the Discord Developer Portal.")
 logger.info("Visit: https://discord.com/developers/applications/ -> Your Application -> Bot -> Privileged Gateway Intents")
 
@@ -40,13 +35,11 @@ DATA_DIR.mkdir(exist_ok=True)
 
 MEETUPS_FILE = DATA_DIR / 'meetups.json'
 
-# Create default meetups file if it doesn't exist
 if not MEETUPS_FILE.exists():
     default_meetups = {"meetups": []}
     with open(MEETUPS_FILE, 'w', encoding='utf-8') as f:
         json.dump(default_meetups, f, indent=2)
 
-# Function to read meetups from the JSON file
 def get_meetups():
     try:
         with open(MEETUPS_FILE, 'r', encoding='utf-8') as f:
@@ -55,7 +48,6 @@ def get_meetups():
         logger.error(f"Error reading meetups file: {e}")
         return {"meetups": []}
 
-# Function to save meetups to the JSON file
 def save_meetups(meetups_data):
     try:
         with open(MEETUPS_FILE, 'w', encoding='utf-8') as f:
@@ -65,13 +57,11 @@ def save_meetups(meetups_data):
         logger.error(f"Error saving meetups file: {e}")
         return False
 
-# Function to generate a unique ID for a new meetup
 def generate_meetup_id():
     meetups_data = get_meetups()
     ids = [meetup["id"] for meetup in meetups_data["meetups"]]
     return max(ids) + 1 if ids else 1
 
-# Function to fetch GIFs from Nekotina API
 async def fetch_nekotina_gif(type):
     try:
         async with aiohttp.ClientSession() as session:
@@ -93,29 +83,24 @@ async def on_ready():
     except Exception as e:
         logger.error(f"Failed to sync commands: {e}")
 
-# Command to show bot information
 @bot.tree.command(name="botinfo", description="Muestra información sobre el bot")
 async def botinfo(interaction: discord.Interaction):
     await interaction.response.defer()
     
-    # Get bot information
     bot_name = bot.user.name
     bot_avatar = bot.user.display_avatar.url
     bot_creation_date = bot.user.created_at
     formatted_creation_date = bot_creation_date.strftime("%A, %d de %B de %Y, %H:%M")
     
-    # Calculate total lines of code and size
     total_lines = 0
     total_size = 0
     
-    # Modified to only count lines in bot.py file
     bot_file_path = Path(__file__)
     if bot_file_path.is_file():
         total_size = bot_file_path.stat().st_size
         with open(bot_file_path, 'r', encoding='utf-8', errors='ignore') as f:
             total_lines = sum(1 for _ in f)
     
-    # Format bytes to more readable format
     def format_bytes(bytes, decimals=2):
         if bytes == 0:
             return '0 Bytes'
@@ -125,7 +110,6 @@ async def botinfo(interaction: discord.Interaction):
         i = int(math.log(bytes, k))
         return f"{bytes / (k ** i):.{dm}f} {sizes[i]}"
     
-    # Create an embed to display the bot information
     embed = discord.Embed(
         title=f"Información de {bot_name}",
         description="A Discord bot for managing and displaying meetups",
@@ -143,7 +127,6 @@ async def botinfo(interaction: discord.Interaction):
     
     await interaction.followup.send(embed=embed)
 
-# Command to show meetups
 @bot.tree.command(name="quedadas", description="Muestra las quedadas activas y pendientes")
 async def quedadas(interaction: discord.Interaction):
     meetups_data = get_meetups()
@@ -152,7 +135,6 @@ async def quedadas(interaction: discord.Interaction):
         await interaction.response.send_message("No hay ninguna quedada pendiente actualmente.")
         return
     
-    # Create an embed to display the meetups
     embed = discord.Embed(
         title="Quedadas",
         description="Lista de quedadas activas y pendientes",
@@ -161,16 +143,13 @@ async def quedadas(interaction: discord.Interaction):
     embed.timestamp = datetime.datetime.now()
     embed.set_footer(text="Platanotorrino Discord Bot")
     
-    # Create buttons for each meetup
     view = discord.ui.View()
     
-    # Add fields for each meetup
     for meetup in meetups_data["meetups"]:
         status_emoji = "🟢" if meetup["status"] == "activo" else "🟡"
         date = datetime.datetime.fromisoformat(meetup["date"].replace('Z', '+00:00'))
         formatted_date = date.strftime("%A, %d de %B de %Y, %H:%M")
         
-        # Format participants
         participants_text = "Ninguno"
         if meetup["participants"] and len(meetup["participants"]) > 0:
             participants_text = ", ".join(meetup["participants"])
@@ -181,13 +160,11 @@ async def quedadas(interaction: discord.Interaction):
             inline=False
         )
         
-        # Create a button for this meetup
         button = discord.ui.Button(label="Unirse a esta quedada", custom_id=f"join_meetup_{meetup['id']}", style=discord.ButtonStyle.primary)
         view.add_item(button)
     
     await interaction.response.send_message(embed=embed, view=view)
 
-# Command to create a new meetup
 @bot.tree.command(name="crear-quedada", description="Crea una nueva quedada")
 @app_commands.describe(
     titulo="Título de la quedada",
@@ -210,7 +187,6 @@ async def crear_quedada(
     lugar: str, 
     estado: str
 ):
-    # Validate date and time format
     import re
     date_regex = re.compile(r'^\d{4}-\d{2}-\d{2}$')
     time_regex = re.compile(r'^\d{2}:\d{2}$')
@@ -223,7 +199,6 @@ async def crear_quedada(
         await interaction.response.send_message("El formato de hora debe ser HH:MM (por ejemplo, 18:30)", ephemeral=True)
         return
     
-    # Create a date object from the date and time strings
     try:
         year, month, day = map(int, fecha.split('-'))
         hours, minutes = map(int, hora.split(':'))
@@ -232,7 +207,6 @@ async def crear_quedada(
         await interaction.response.send_message("La fecha y hora proporcionadas no son válidas", ephemeral=True)
         return
     
-    # Create a new meetup object
     new_meetup = {
         "id": generate_meetup_id(),
         "title": titulo,
@@ -243,13 +217,10 @@ async def crear_quedada(
         "participants": []
     }
     
-    # Add the new meetup to the meetups data
     meetups_data = get_meetups()
     meetups_data["meetups"].append(new_meetup)
     
-    # Save the updated meetups data
     if save_meetups(meetups_data):
-        # Create an embed to display the new meetup
         embed = discord.Embed(
             title="Nueva Quedada Creada",
             description=f'La quedada "{titulo}" ha sido creada correctamente.',
@@ -262,7 +233,6 @@ async def crear_quedada(
         embed.timestamp = datetime.datetime.now()
         embed.set_footer(text="Platanotorrino Discord Bot")
         
-        # Create a button for joining the meetup
         view = discord.ui.View()
         button = discord.ui.Button(label="Unirse a esta quedada", custom_id=f"join_meetup_{new_meetup['id']}", style=discord.ButtonStyle.primary)
         view.add_item(button)
@@ -271,13 +241,11 @@ async def crear_quedada(
     else:
         await interaction.response.send_message("Ha ocurrido un error al crear la quedada", ephemeral=True)
 
-# Command to hug a user
 @bot.tree.command(name="hug", description="Da un abrazo a otro usuario")
 @app_commands.describe(usuario="Usuario al que quieres abrazar")
 async def hug(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a hug GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("hug")
     
     embed = discord.Embed(
@@ -291,13 +259,11 @@ async def hug(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to pat a user
 @bot.tree.command(name="pat", description="Da una palmadita a otro usuario")
 @app_commands.describe(usuario="Usuario al que quieres dar una palmadita")
 async def pat(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a pat GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("pat")
     
     embed = discord.Embed(
@@ -311,13 +277,11 @@ async def pat(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to highfive a user
 @bot.tree.command(name="highfive", description="Choca los cinco con otro usuario")
 @app_commands.describe(usuario="Usuario con el que quieres chocar los cinco")
 async def highfive(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a highfive GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("highfive")
     
     embed = discord.Embed(
@@ -331,13 +295,11 @@ async def highfive(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to poke a user
 @bot.tree.command(name="poke", description="Toca a otro usuario para llamar su atención")
 @app_commands.describe(usuario="Usuario al que quieres tocar")
 async def poke(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a poke GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("poke")
     
     embed = discord.Embed(
@@ -351,7 +313,6 @@ async def poke(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to show help with all available commands
 @bot.tree.command(name="help", description="Muestra todos los comandos disponibles")
 @app_commands.describe(categoria="Categoría de comandos a mostrar (opcional)")
 @app_commands.choices(categoria=[
@@ -364,7 +325,6 @@ async def poke(interaction: discord.Interaction, usuario: discord.Member):
 async def help_command(interaction: discord.Interaction, categoria: str = "todos"):
     await interaction.response.defer()
     
-    # Define command categories
     categories = {
         "admin": {
             "name": "🛠️ Administración",
@@ -388,20 +348,16 @@ async def help_command(interaction: discord.Interaction, categoria: str = "todos
         }
     }
     
-    # Get all commands from the command tree
     all_commands = bot.tree.get_commands()
     
-    # Create an embed to display commands
     embed = discord.Embed(
         title="Comandos Disponibles",
         description="Aquí tienes una lista de los comandos disponibles",
         color=0x3498db
     )
     
-    # Function to add commands to embed
     def add_commands_to_embed(commands_list):
         for cmd in commands_list:
-            # Get parameters info if available
             params_info = ""
             if hasattr(cmd, 'parameters') and cmd.parameters:
                 params = [f"<{param.name}>" for param in cmd.parameters]
@@ -414,19 +370,16 @@ async def help_command(interaction: discord.Interaction, categoria: str = "todos
                 inline=False
             )
     
-    # If a specific category is requested
     if categoria != "todos" and categoria in categories:
         cat_info = categories[categoria]
         embed.title = f"Comandos de {cat_info['name']}"
         embed.description = cat_info['description']
         
-        # Filter commands for this category
         category_commands = [cmd for cmd in all_commands if cmd.name in cat_info['commands']]
         category_commands.sort(key=lambda x: x.name)
         
         add_commands_to_embed(category_commands)
     else:
-        # Show all categories with their commands
         for cat_id, cat_info in categories.items():
             embed.add_field(
                 name=cat_info['name'],
@@ -434,13 +387,10 @@ async def help_command(interaction: discord.Interaction, categoria: str = "todos
                 inline=False
             )
             
-            # Filter and sort commands for this category
             category_commands = [cmd for cmd in all_commands if cmd.name in cat_info['commands']]
             category_commands.sort(key=lambda x: x.name)
             
-            # Add each command to the embed
             for cmd in category_commands:
-                # Get parameters info if available
                 params_info = ""
                 if hasattr(cmd, 'parameters') and cmd.parameters:
                     params = [f"<{param.name}>" for param in cmd.parameters]
@@ -458,19 +408,15 @@ async def help_command(interaction: discord.Interaction, categoria: str = "todos
     
     await interaction.followup.send(embed=embed)
 
-# Command to delete a meetup
 @bot.tree.command(name="eliminar-quedada", description="Elimina una quedada existente")
 @app_commands.describe(id_quedada="ID de la quedada a eliminar")
 async def eliminar_quedada(interaction: discord.Interaction, id_quedada: int):
-    # Check if user has manage messages permission
     if not interaction.user.guild_permissions.manage_messages:
         await interaction.response.send_message("No tienes permisos para eliminar quedadas", ephemeral=True)
         return
     
-    # Get meetups data
     meetups_data = get_meetups()
     
-    # Find the meetup with the given ID
     meetup_index = None
     for i, meetup in enumerate(meetups_data["meetups"]):
         if meetup["id"] == id_quedada:
@@ -481,15 +427,11 @@ async def eliminar_quedada(interaction: discord.Interaction, id_quedada: int):
         await interaction.response.send_message(f"No se encontró ninguna quedada con ID {id_quedada}", ephemeral=True)
         return
     
-    # Get the meetup details before removing it
     meetup = meetups_data["meetups"][meetup_index]
     
-    # Remove the meetup from the list
     del meetups_data["meetups"][meetup_index]
     
-    # Save the updated meetups data
     if save_meetups(meetups_data):
-        # Create an embed to confirm deletion
         embed = discord.Embed(
             title="Quedada Eliminada",
             description=f'La quedada "{meetup["title"]}" ha sido eliminada correctamente.',
@@ -504,16 +446,11 @@ async def eliminar_quedada(interaction: discord.Interaction, id_quedada: int):
     else:
         await interaction.response.send_message("Ha ocurrido un error al eliminar la quedada", ephemeral=True)
 
-if __name__ == "__main__":
-    bot.run(TOKEN)
-
-# Command to slap a user
 @bot.tree.command(name="slap", description="Da una bofetada a otro usuario")
 @app_commands.describe(usuario="Usuario al que quieres dar una bofetada")
 async def slap(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a slap GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("slap")
     
     embed = discord.Embed(
@@ -527,13 +464,11 @@ async def slap(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to kiss a user
 @bot.tree.command(name="kiss", description="Da un beso a otro usuario")
 @app_commands.describe(usuario="Usuario al que quieres dar un beso")
 async def kiss(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a kiss GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("kiss")
     
     embed = discord.Embed(
@@ -547,13 +482,11 @@ async def kiss(interaction: discord.Interaction, usuario: discord.Member):
     
     await interaction.followup.send(embed=embed)
 
-# Command to dance with a user
 @bot.tree.command(name="dance", description="Baila con otro usuario")
 @app_commands.describe(usuario="Usuario con el que quieres bailar")
 async def dance(interaction: discord.Interaction, usuario: discord.Member):
     await interaction.response.defer()
     
-    # Fetch a dance GIF from Nekotina API
     gif_url = await fetch_nekotina_gif("dance")
     
     embed = discord.Embed(
@@ -566,3 +499,6 @@ async def dance(interaction: discord.Interaction, usuario: discord.Member):
     embed.set_footer(text="Platanotorrino Discord Bot")
     
     await interaction.followup.send(embed=embed)
+
+if __name__ == "__main__":
+    bot.run(TOKEN)
